@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=AI CLI Assistant
+Comment=AI Assistant CLI - Like Google Gemini for your terminal
+Exec=/home/dev/Documents/GitHub/python/ai-cli/start.sh
+Icon=terminal
+Type=Application
+Categories=Development;Utility;
+Terminal=true
+Path=/home/dev/Documents/GitHub/python/ai-cli
+StartupNotify=true
