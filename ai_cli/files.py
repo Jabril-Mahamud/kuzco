@@ -13,13 +13,55 @@ class FileHandler:
     """Handles file reading and editing operations"""
 
     @staticmethod
-    def read_file_content(file_path: Path) -> Optional[str]:
-        """Read file content with error handling"""
+    def find_file_case_insensitive(file_path: Path) -> Optional[Path]:
+        """Find file with case-insensitive matching and suggest alternatives"""
+        if file_path.exists():
+            return file_path
+
+        # Try case-insensitive search in the same directory
+        parent_dir = file_path.parent
+        target_name = file_path.name.lower()
+
         try:
-            if not file_path.exists():
-                console.print(f"[bold red]File not found:[/bold red] {file_path}")
-                return None
-            return file_path.read_text(encoding='utf-8')
+            for item in parent_dir.iterdir():
+                if item.is_file() and item.name.lower() == target_name:
+                    console.print(f"[bold yellow]💡 Found similar file:[/bold yellow] {item.name}")
+                    return item
+        except Exception:
+            pass
+
+        # Suggest files with similar names
+        try:
+            similar_files = []
+            for item in parent_dir.iterdir():
+                if item.is_file() and target_name in item.name.lower():
+                    similar_files.append(item.name)
+
+            if similar_files:
+                console.print(f"[bold yellow]💡 Did you mean one of these?[/bold yellow]")
+                for file in similar_files[:5]:  # Show max 5 suggestions
+                    console.print(f"  • {file}")
+        except Exception:
+            pass
+
+        return None
+
+    @staticmethod
+    def read_file_content(file_path: Path) -> Optional[str]:
+        """Read file content with error handling and case-insensitive matching"""
+        try:
+            # First try exact match
+            if file_path.exists():
+                return file_path.read_text(encoding='utf-8')
+
+            # Try case-insensitive search
+            found_file = FileHandler.find_file_case_insensitive(file_path)
+            if found_file:
+                return found_file.read_text(encoding='utf-8')
+
+            console.print(f"[bold red]File not found:[/bold red] {file_path}")
+            return None
+
         except UnicodeDecodeError:
             console.print(f"[bold red]Error:[/bold red] Cannot read {file_path} as text file")
             return None

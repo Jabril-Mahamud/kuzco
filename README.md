@@ -1,14 +1,15 @@
-# AI CLI Assistant
+# Kuzco - AI CLI Assistant
 
 A simple AI-powered command-line assistant that brings LLM capabilities to your terminal using Ollama. Set it up once and you have your own Gemini-like assistant based on Ollama.
 
 ## Features
 
-- 🤖 **Interactive Chat** - Beautiful conversational interface
+- 🤖 **Interactive Chat** - Beautiful conversational interface with special commands
 - 📁 **File Analysis** - Analyze and understand code/text files
 - ✏️ **File Editing** - AI-assisted file modifications with backups
 - 🖥️ **System Assistant** - Get Ubuntu/Linux system help
 - 🛡️ **Safe Mode** - Automatic backups to protect your files
+- 🔍 **Smart File Matching** - Case-insensitive file discovery
 
 ## Quick Setup
 
@@ -31,24 +32,33 @@ A simple AI-powered command-line assistant that brings LLM capabilities to your 
 
 4. **Run**:
    ```bash
-   python main.py
+   kuzco
    ```
 
 ## Usage
 
+### Command Line
 ```bash
 # Interactive chat
-python main.py
+kuzco
 
 # Analyze a file
-python main.py --read script.py
+kuzco --read script.py
 
 # Edit a file
-python main.py --edit config.json --instruction "add debug settings"
+kuzco --edit config.json --instruction "add debug settings"
 
 # System help
-python main.py --system "how to install docker"
+kuzco --system "how to install docker"
 ```
+
+### Special Chat Commands
+Once in chat mode, use these commands:
+- `/read <file> [prompt]` - Analyze a file
+- `/edit <file> <instruction>` - Edit a file
+- `/system <question>` - Ask system questions
+- `/help` - Show all commands
+- `/clear` - Clear conversation history
 
 ## Configuration
 
@@ -63,5 +73,9 @@ Copy `.env.example` to `.env` and customize:
 - Python 3.8+
 - Ollama (running locally)
 - Dependencies in `requirements.txt`
+
+## Global Installation
+
+The app is set up as `kuzco` command globally. Use `kuzco` from anywhere in your terminal.
 
 That's it! Simple setup, powerful AI assistant.

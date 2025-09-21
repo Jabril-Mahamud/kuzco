@@ -23,9 +23,12 @@ class AIAssistant:
     """Main AI Assistant with chat and task capabilities"""
 
     def __init__(self, model_name: Optional[str] = None):
+        # Create config instance
+        self.config = Config()
+
         # Use environment default model if available, otherwise use provided or select
-        if not model_name and Config.DEFAULT_MODEL:
-            model_name = Config.DEFAULT_MODEL
+        if not model_name and self.config.DEFAULT_MODEL:
+            model_name = self.config.DEFAULT_MODEL
 
         self.model_name: str = model_name or ModelManager.select_model()
         self.conversation: List[Dict[str, str]] = []
@@ -37,9 +40,9 @@ class AIAssistant:
             sys.exit(1)
 
         # Show safe mode status
-        if not Config.SAFE_MODE:
+        if not self.config.SAFE_MODE:
             console.print("[bold yellow]⚠️  Safe mode is DISABLED - backups will not be created[/bold yellow]")
-        elif not Config.CREATE_BACKUPS:
+        elif not self.config.CREATE_BACKUPS:
             console.print("[bold yellow]⚠️  Backup creation is DISABLED[/bold yellow]")
 
     def stream_response(self, messages: List[Dict[str, str]], show_spinner: bool = True, context: str = "chat") -> str:
@@ -74,10 +77,10 @@ class AIAssistant:
                         in_thoughts = True
                         thought_content += token
                         console.print("[bold blue]💭 Thoughts:[/bold blue]")
-                        console.print("[dim blue]" + token + "[/dim blue]", end="", flush=True)
+                        console.print("[dim blue]" + token + "[/dim blue]", end="", )
                     else:
                         console.print("[bold green]🤖 Assistant:[/bold green]")
-                        console.print(token, end="", flush=True)
+                        console.print(token, end="", )
 
                     response_text += token
 
@@ -89,16 +92,16 @@ class AIAssistant:
                             if token.startswith('</') and '>' in token:
                                 # End of thoughts
                                 thought_content += token
-                                console.print("[dim blue]" + token + "[/dim blue]", end="", flush=True)
+                                console.print("[dim blue]" + token + "[/dim blue]", end="", )
                                 console.print()  # Newline after thoughts
                                 console.print("[bold cyan]─────────────────────────────────────────────────────────[/bold cyan]")
                                 console.print("[bold green]🤖 Response:[/bold green]")
                                 in_thoughts = False
                             else:
                                 thought_content += token
-                                console.print("[dim blue]" + token + "[/dim blue]", end="", flush=True)
+                                console.print("[dim blue]" + token + "[/dim blue]", end="", )
                         else:
-                            console.print(token, end="", flush=True)
+                            console.print(token, end="", )
 
                         response_text += token
             else:
@@ -111,7 +114,7 @@ class AIAssistant:
 
                 for chunk in stream:
                     token = chunk['message']['content']
-                    console.print(token, end="", flush=True)
+                    console.print(token, end="", )
                     response_text += token
 
             console.print()  # newline after response
@@ -145,25 +148,30 @@ class AIAssistant:
         console.print("[bold cyan]│[/bold cyan] [bold yellow]Model:[/bold yellow] [bold white]{self.model_name}[/bold white] [bold cyan]│[/bold cyan]")
 
         # Show safe mode status
-        if Config.SAFE_MODE and Config.CREATE_BACKUPS:
+        if self.config.SAFE_MODE and self.config.CREATE_BACKUPS:
             console.print("[bold cyan]│[/bold cyan] [bold green]🛡️  Safe mode: ENABLED (backups will be created)[/bold green] [bold cyan]│[/bold cyan]")
-        elif Config.SAFE_MODE and not Config.CREATE_BACKUPS:
+        elif self.config.SAFE_MODE and not self.config.CREATE_BACKUPS:
             console.print("[bold cyan]│[/bold cyan] [bold yellow]🛡️  Safe mode: ENABLED (backups disabled)[/bold yellow] [bold cyan]│[/bold cyan]")
         else:
             console.print("[bold cyan]│[/bold cyan] [bold red]🛡️  Safe mode: DISABLED[/bold red] [bold cyan]│[/bold cyan]")
 
         console.print("[bold cyan]│[/bold cyan] [bold magenta]Type 'exit', 'quit', or Ctrl+C to quit[/bold magenta] [bold cyan]│[/bold cyan]")
+        console.print("[bold cyan]│[/bold cyan] [bold yellow]Use /help for special commands[/bold yellow] [bold cyan]│[/bold cyan]")
         console.print("[bold cyan]╰─────────────────────────────────────────────────────────╯[/bold cyan]\n")
 
         try:
             while True:
                 user_input = console.input("[bold green]👤 You:[/bold green] ").strip()
 
-                if user_input.lower() in Config.EXIT_COMMANDS:
+                if user_input.lower() in self.config.EXIT_COMMANDS:
                     console.print("\n[bold magenta]👋 Goodbye![/bold magenta]")
                     break
 
                 if not user_input:
+                    continue
+
+                # Check for special commands
+                if self._handle_special_commands(user_input):
                     continue
 
                 # Add user message to conversation
@@ -181,6 +189,64 @@ class AIAssistant:
 
         except KeyboardInterrupt:
             console.print("\n[bold magenta]Goodbye![/bold magenta]")
+
+    def _handle_special_commands(self, user_input: str) -> bool:
+        """Handle special commands within chat mode. Returns True if command was handled."""
+        input_lower = user_input.lower().strip()
+
+        # /read command: /read <file> [prompt]
+        if input_lower.startswith('/read '):
+            parts = user_input[6:].strip().split(' ', 1)
+            file_path = parts[0]
+            custom_prompt = parts[1] if len(parts) > 1 else None
+
+            console.print(f"[bold cyan]📖 Reading file:[/bold cyan] {file_path}")
+            self.analyze_file(file_path, custom_prompt)
+            return True
+
+        # /edit command: /edit <file> <instruction>
+        elif input_lower.startswith('/edit '):
+            parts = user_input[6:].strip().split(' ', 1)
+            if len(parts) < 2:
+                console.print("[bold red]Usage: /edit <file> <instruction>[/bold red]")
+                return True
+            file_path = parts[0]
+            instruction = parts[1]
+
+            console.print(f"[bold cyan]✏️  Editing file:[/bold cyan] {file_path}")
+            self.edit_file(file_path, instruction)
+            return True
+
+        # /system command: /system <question>
+        elif input_lower.startswith('/system '):
+            question = user_input[8:].strip()
+            console.print(f"[bold cyan]🖥️  System question:[/bold cyan] {question}")
+            self.system_assistant(question)
+            return True
+
+        # /help command
+        elif input_lower == '/help':
+            self._show_chat_help()
+            return True
+
+        # /clear command
+        elif input_lower == '/clear':
+            self.conversation.clear()
+            console.print("[bold green]🧹 Conversation history cleared![/bold green]")
+            return True
+
+        return False
+
+    def _show_chat_help(self):
+        """Show help for special chat commands"""
+        console.print("\n[bold cyan]📋 Special Chat Commands:[/bold cyan]")
+        console.print("[bold yellow]/read <file> [prompt][/bold yellow] - Analyze a file")
+        console.print("[bold yellow]/edit <file> <instruction>[/bold yellow] - Edit a file with AI")
+        console.print("[bold yellow]/system <question>[/bold yellow] - Ask system/Ubuntu questions")
+        console.print("[bold yellow]/help[/bold yellow] - Show this help")
+        console.print("[bold yellow]/clear[/bold yellow] - Clear conversation history")
+        console.print("[bold yellow]exit, quit, bye, goodbye[/bold yellow] - Exit chat")
+        console.print()
 
     def analyze_file(self, file_path: str, custom_prompt: Optional[str] = None) -> None:
         """Read and analyze a file with loading animation"""
