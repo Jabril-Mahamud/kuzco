@@ -6,7 +6,7 @@ A simple AI-powered command-line assistant that brings LLM capabilities to your 
 
 - 🤖 **Interactive Chat** - Beautiful conversational interface with special commands
 - 📁 **File Analysis** - Analyze and understand code/text files
-- ✏️ **File Editing** - AI-assisted file modifications with backups ⚠️ *Note: Edit functionality doesn't quite work yet as it's adding too much junk*
+- ✏️ **File Editing** - AI-assisted file modifications with backups ⚠️ *Note: Edit functionality doesn't quite work yet as it's adding too much junk, specifically it's thoughts.*
 - 🖥️ **System Assistant** - Get Ubuntu/Linux system help
 - 🛡️ **Safe Mode** - Automatic backups to protect your files
 - 🔍 **Smart File Matching** - Case-insensitive file discovery
