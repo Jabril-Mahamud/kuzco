@@ -1,12 +1,13 @@
 # Kuzco - AI CLI Assistant
 
-A simple AI-powered command-line assistant that brings LLM capabilities to your terminal using Ollama. Set it up once and you have your own Gemini-like assistant based on Ollama.
+A simple AI-powered command-line assistant that brings LLM capabilities to your terminal using Ollama. Set it up once and you have your own Gemini-like assistant based on Ollama. In my experience, **gpt-oss** performs best for editing; other models tend to add a lot of junk.
 
 ## Features
 
 - 🤖 **Interactive Chat** - Beautiful conversational interface with special commands
 - 📁 **File Analysis** - Analyze and understand code/text files
 - ✏️ **File Editing** - AI-assisted file modifications with backups ⚠️ *Note: Edit functionality doesn't quite work yet as it's adding too much junk, specifically it's thoughts.*
+- 🦙 **LLM Models** - Prefer **gpt-oss** for editing; other models may produce excessive noise
 - 🖥️ **System Assistant** - Get Ubuntu/Linux system help
 - 🛡️ **Safe Mode** - Automatic backups to protect your files
 - 🔍 **Smart File Matching** - Case-insensitive file discovery
@@ -14,31 +15,27 @@ A simple AI-powered command-line assistant that brings LLM capabilities to your 
 ## Quick Setup
 
 1. **Install Ollama** (if not already installed):
-   ```bash
-   curl -fsSL https://ollama.com/install.sh | sh
+      curl -fsSL https://ollama.com/install.sh | sh
    ollama pull llama3.2
-   ```
+   # For best editing experience, consider pulling gpt-oss: ollama pull gpt-oss
+   
 
 2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+      pip install -r requirements.txt
+   
 
 3. **Configure** (optional):
-   ```bash
-   cp .env.example .env
+      cp .env.example .env
    # Edit .env to customize settings
-   ```
+   
 
 4. **Run**:
-   ```bash
-   kuzco
-   ```
+      kuzco
+   
 
 ## Usage
 
 ### Command Line
-```bash
 # Interactive chat
 kuzco
 
@@ -47,10 +44,10 @@ kuzco --read script.py
 
 # Edit a file
 kuzco --edit config.json --instruction "add debug settings"
+# Note: Using gpt-oss improves editing quality
 
 # System help
 kuzco --system "how to install docker"
-```
 
 ### Special Chat Commands
 Once in chat mode, use these commands:

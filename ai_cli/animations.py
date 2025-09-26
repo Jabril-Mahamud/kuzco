@@ -160,3 +160,8 @@ class LoadingAnimations:
                 live.update(f"[bold cyan]{frames[frame_index]}[/bold cyan]")
                 frame_index = (frame_index + 1) % len(frames)
                 time.sleep(0.25)
+
+
+def show_thinking_animation():
+    """Context manager for showing thinking animation during AI operations"""
+    return LoadingAnimations.simple_spinner()

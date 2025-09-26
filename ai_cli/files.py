@@ -1,114 +1,133 @@
-"""File reading and editing operations"""
+import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from rich.console import Console
-from rich.syntax import Syntax
-from rich.panel import Panel
-from ai_cli.config import Config
 
 console = Console()
 
-
-class FileHandler:
-    """Handles file reading and editing operations"""
-
-    @staticmethod
-    def find_file_case_insensitive(file_path: Path) -> Optional[Path]:
-        """Find file with case-insensitive matching and suggest alternatives"""
-        if file_path.exists():
-            return file_path
-
-        # Try case-insensitive search in the same directory
-        parent_dir = file_path.parent
-        target_name = file_path.name.lower()
-
-        try:
-            for item in parent_dir.iterdir():
-                if item.is_file() and item.name.lower() == target_name:
-                    console.print(f"[bold yellow]💡 Found similar file:[/bold yellow] {item.name}")
-                    return item
-        except Exception:
-            pass
-
-        # Suggest files with similar names
-        try:
-            similar_files = []
-            for item in parent_dir.iterdir():
-                if item.is_file() and target_name in item.name.lower():
-                    similar_files.append(item.name)
-
-            if similar_files:
-                console.print(f"[bold yellow]💡 Did you mean one of these?[/bold yellow]")
-                for file in similar_files[:5]:  # Show max 5 suggestions
-                    console.print(f"  • {file}")
-        except Exception:
-            pass
-
-        return None
-
-    @staticmethod
-    def read_file_content(file_path: Path) -> Optional[str]:
-        """Read file content with error handling and case-insensitive matching"""
-        try:
-            # First try exact match
-            if file_path.exists():
-                return file_path.read_text(encoding='utf-8')
-
-            # Try case-insensitive search
-            found_file = FileHandler.find_file_case_insensitive(file_path)
-            if found_file:
-                return found_file.read_text(encoding='utf-8')
-
-            console.print(f"[bold red]File not found:[/bold red] {file_path}")
-            return None
-
-        except UnicodeDecodeError:
-            console.print(f"[bold red]Error:[/bold red] Cannot read {file_path} as text file")
-            return None
-        except Exception as e:
-            console.print(f"[bold red]Error reading file:[/bold red] {e}")
-            return None
-
-    @staticmethod
-    def display_file_info(path: Path, content: str) -> None:
-        """Display file information panel"""
-        console.print(Panel(
-            f"[bold]File:[/bold] {path.name}\n"
-            f"[bold]Size:[/bold] {len(content)} characters\n"
-            f"[bold]Lines:[/bold] {len(content.splitlines())}",
-            title="📁 File Info",
-            border_style="blue"
-        ))
-
-    @staticmethod
-    def display_file_preview(path: Path, content: str) -> None:
-        """Display syntax-highlighted file preview"""
-        if len(content) < Config.MAX_PREVIEW_SIZE:
-            syntax = Syntax(
-                content,
-                path.suffix[1:] if path.suffix else "text",
-                theme=Config.DEFAULT_THEME,
-                line_numbers=True
-            )
-            console.print(Panel(syntax, title="📄 File Preview", border_style="green"))
-
-    @staticmethod
-    def create_backup(path: Path, content: str) -> Path:
-        """Create a backup of the file if safe mode is enabled"""
-        if not Config.CREATE_BACKUPS:
-            console.print("[bold yellow]⚠️  Safe mode disabled - no backup created[/bold yellow]")
-            return path
-
-        backup_path = path.parent / f"backup_{path.name}"
-        backup_path.write_text(content)
-        console.print(f"[bold green]💾 Backup created:[/bold green] [bold white]{backup_path}[/bold white]")
-        return backup_path
+class EnhancedFileHandler:
+    """Enhanced file handler with robust AI response cleaning"""
 
     @staticmethod
     def clean_ai_response(content: str) -> str:
-        """Remove markdown code blocks from AI response if present"""
-        if content.startswith('```'):
-            lines = content.split('\n')
-            if len(lines) > 2:
-                return '\n'.join(lines[1:-1])
+        """Remove all AI artifacts from response - thoughts, markdown, explanations"""
+
+        # Remove thinking tags and their content
+        # Handles various formats: <thinking>, <thoughts>, <reasoning>, etc.
+        thinking_patterns = [
+            r'<thinking>.*?</thinking>',
+            r'<thoughts>.*?</thoughts>',
+            r'<reasoning>.*?</reasoning>',
+            r'<reflection>.*?</reflection>',
+            r'<planning>.*?</planning>',
+            r'<analysis>.*?</analysis>',
+        ]
+
+        for pattern in thinking_patterns:
+            content = re.sub(pattern, '', content, flags=re.DOTALL | re.IGNORECASE)
+
+        # Remove markdown code blocks with language specifiers
+        # Matches ```python, ```javascript, etc.
+        content = re.sub(r'```[\w]*\n(.*?)```', r'\1', content, flags=re.DOTALL)
+
+        # Remove standalone code blocks
+        content = re.sub(r'```\n?(.*?)```', r'\1', content, flags=re.DOTALL)
+
+        # Remove common AI explanation prefixes/suffixes
+        explanation_patterns = [
+            r'^Here\'s the .*?:\n+',  # "Here's the modified file:"
+            r'^Here is the .*?:\n+',
+            r'^Modified content:\n+',
+            r'^Updated file:\n+',
+            r'^Fixed version:\n+',
+            r'^Edited content:\n+',
+            r'^\s*---+\s*\n',  # Separator lines
+            r'\n\s*---+\s*$',
+            r'^The following.*?:\n+',
+            r'^Below is.*?:\n+',
+        ]
+
+        for pattern in explanation_patterns:
+            content = re.sub(pattern, '', content, flags=re.MULTILINE | re.IGNORECASE)
+
+        # Remove trailing explanations (often after the actual content)
+        # Look for patterns like "This code..." or "The above..."
+        trailing_explanation = re.search(
+            r'\n\n(This\s|The\s+above|I\'ve\s|Note\s|Notice|Explanation:|Changes:)',
+            content,
+            re.IGNORECASE
+        )
+        if trailing_explanation:
+            content = content[:trailing_explanation.start()]
+
+        # Clean up excessive whitespace
+        content = re.sub(r'\n{3,}', '\n\n', content)  # Max 2 newlines
+        content = content.strip()
+
         return content
+
+    @staticmethod
+    def validate_cleaned_content(original: str, cleaned: str, file_type: str) -> Tuple[bool, str]:
+        """Validate that cleaned content is reasonable"""
+
+        # Check if content was overly stripped
+        if not cleaned or len(cleaned) < 10:
+            return False, "Content appears to be empty after cleaning"
+
+        # Check if we accidentally removed too much (> 90% reduction is suspicious)
+        if len(cleaned) < len(original) * 0.1:
+            return False, "Content reduced by more than 90% - may be over-cleaned"
+
+        # Basic syntax validation for code files
+        code_extensions = {'.py', '.js', '.java', '.cpp', '.c', '.go', '.rs'}
+        if file_type in code_extensions:
+            # Check for basic code structure
+            if file_type == '.py' and 'def ' not in cleaned and 'class ' not in cleaned and 'import ' not in cleaned:
+                if len(cleaned) > 50:  # Only warn for non-trivial files
+                    console.print("[yellow]⚠️  Warning: No Python keywords found in cleaned content[/yellow]")
+
+        return True, "Content validated successfully"
+
+    @staticmethod
+    def extract_code_from_response(response: str, file_type: str) -> str:
+        """Extract only the code/content from AI response, handling various formats"""
+
+        # First, try to find content between specific markers
+        content_markers = [
+            (r'Modified content:\s*\n(.*)', r'\1'),
+            (r'```[\w]*\n(.*?)```', r'\1'),  # Code blocks
+            (r'<content>(.*?)</content>', r'\1'),  # XML-style tags
+            (r'<file>(.*?)</file>', r'\1'),
+        ]
+
+        for pattern, replacement in content_markers:
+            match = re.search(pattern, response, re.DOTALL | re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+
+        # If no markers found, clean the entire response
+        return EnhancedFileHandler.clean_ai_response(response)
+
+    @staticmethod
+    def create_edit_prompt(file_path: str, content: str, instruction: str) -> str:
+        """Create a more explicit edit prompt that minimizes artifacts"""
+
+        return f"""You are a code editor. Your task is to modify the file according to the instruction.
+
+CRITICAL RULES:
+1. Return ONLY the complete modified file content
+2. Do NOT include any explanations, thoughts, or markdown formatting
+3. Do NOT wrap the code in backticks or code blocks
+4. Do NOT add prefixes like "Here's the modified file:"
+5. Start directly with the actual file content
+
+File: {file_path}
+Current content:
+---START FILE---
+{content}
+---END FILE---
+
+Instruction: {instruction}
+
+Return the complete modified file content below (no formatting, no explanations):
+"""
