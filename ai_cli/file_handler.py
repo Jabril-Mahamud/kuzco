@@ -1,12 +1,127 @@
+"""
+AI Assistant CLI - File Handler Module
+Handles both file content processing and AI-powered file operations
+"""
 import re
 from pathlib import Path
 from typing import Optional, Tuple
 from rich.console import Console
+from rich.panel import Panel
+from rich.markdown import Markdown
+import ollama
+
+from ai_cli.config import Config
+from ai_cli.errors import ErrorHandler, handle_errors
+from ai_cli.animations import show_thinking_animation
 
 console = Console()
 
-class EnhancedFileHandler:
-    """Enhanced file handler with robust AI response cleaning"""
+
+class FileHandler:
+    """Handles file operations and content processing"""
+
+    def __init__(self, model: str, config: Config):
+        """Initialize file handler"""
+        self.model = model
+        self.config = config
+
+    @handle_errors()
+    def analyze_file(self, file_path: str, custom_prompt: Optional[str] = None):
+        """Analyze a file and provide insights"""
+        try:
+            # Read file content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Create analysis prompt
+            prompt = custom_prompt or "Analyze this code and provide insights about its structure, functionality, and potential improvements."
+
+            full_prompt = f"""File: {file_path}
+Content:
+```{Path(file_path).suffix[1:] if Path(file_path).suffix else 'text'}
+{content}
+```
+
+{prompt}"""
+
+            console.print(f"[bold blue]🔍 Analyzing {file_path}...[/bold blue]")
+
+            # Show thinking animation
+            with show_thinking_animation():
+                response = ollama.chat(
+                    model=self.model,
+                    messages=[{"role": "user", "content": full_prompt}]
+                )
+
+            # Display results
+            analysis = response['message']['content']
+            console.print(Panel(
+                Markdown(analysis),
+                title=f"📄 Analysis of {Path(file_path).name}",
+                border_style="blue"
+            ))
+
+        except FileNotFoundError:
+            ErrorHandler.handle_file_error(file_path, "read")
+        except Exception as e:
+            console.print(f"[red]Error analyzing file: {e}[/red]")
+
+    @handle_errors()
+    def edit_file(self, file_path: str, instruction: str):
+        """Edit a file using AI assistance"""
+        try:
+            # Read current file content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                original_content = f.read()
+
+            # Create edit prompt
+            edit_prompt = self.create_edit_prompt(file_path, original_content, instruction)
+
+            console.print(f"[bold yellow]✏️  Editing {file_path}...[/bold yellow]")
+            console.print(f"[dim]Instruction: {instruction}[/dim]")
+
+            # Show thinking animation
+            with show_thinking_animation():
+                response = ollama.chat(
+                    model=self.model,
+                    messages=[{"role": "user", "content": edit_prompt}]
+                )
+
+            # Clean the AI response
+            cleaned_content = self.clean_ai_response(response['message']['content'])
+
+            # Validate the cleaned content
+            is_valid, validation_msg = self.validate_cleaned_content(
+                original_content, cleaned_content, Path(file_path).suffix
+            )
+
+            if not is_valid:
+                console.print(f"[red]⚠️  {validation_msg}[/red]")
+                console.print("[yellow]Raw response for manual review:[/yellow]")
+                console.print(Panel(
+                    response['message']['content'],
+                    title="Raw AI Response",
+                    border_style="yellow"
+                ))
+                return
+
+            # Create backup if enabled
+            if self.config.CREATE_BACKUPS:
+                backup_path = f"{file_path}.backup"
+                with open(backup_path, 'w', encoding='utf-8') as f:
+                    f.write(original_content)
+                console.print(f"[dim]Backup created: {backup_path}[/dim]")
+
+            # Write the edited content
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(cleaned_content)
+
+            console.print(f"[green]✅ Successfully edited {file_path}[/green]")
+
+        except FileNotFoundError:
+            ErrorHandler.handle_file_error(file_path, "read")
+        except Exception as e:
+            console.print(f"[red]Error editing file: {e}[/red]")
 
     @staticmethod
     def clean_ai_response(content: str) -> str:
@@ -106,7 +221,7 @@ class EnhancedFileHandler:
                 return match.group(1).strip()
 
         # If no markers found, clean the entire response
-        return EnhancedFileHandler.clean_ai_response(response)
+        return FileHandler.clean_ai_response(response)
 
     @staticmethod
     def create_edit_prompt(file_path: str, content: str, instruction: str) -> str:

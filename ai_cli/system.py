@@ -1,17 +1,55 @@
-"""System command execution with safety checks"""
+"""
+AI Assistant CLI - System Operations Module
+Handles both AI-powered system assistance and command execution
+"""
 import subprocess
-from typing import List
+from typing import List, Optional
 from rich.console import Console
+from rich.panel import Panel
+from rich.markdown import Markdown
+import ollama
+
 from ai_cli.config import Config
+from ai_cli.errors import handle_errors
+from ai_cli.animations import show_thinking_animation
 
 console = Console()
 
 
-class CommandExecutor:
-    """Handles system command execution with safety checks"""
+class SystemOperations:
+    """Handles system/Ubuntu related questions and command execution"""
 
-    def __init__(self, timeout: int = Config.COMMAND_TIMEOUT):
-        self.timeout = timeout
+    def __init__(self, model: str, config: Config):
+        """Initialize system operations"""
+        self.model = model
+        self.config = config
+        self.timeout = config.COMMAND_TIMEOUT
+
+    @handle_errors()
+    def system_assistant(self, question: str):
+        """Handle system/Ubuntu related questions"""
+        system_prompt = """You are a helpful Ubuntu/Linux system assistant.
+        Provide clear, practical answers about system administration, troubleshooting, and best practices.
+        Focus on actionable solutions and explain commands clearly."""
+
+        full_prompt = f"{system_prompt}\n\nQuestion: {question}"
+
+        console.print("[bold green]🖥️  System Assistant[/bold green]")
+
+        # Show thinking animation
+        with show_thinking_animation():
+            response = ollama.chat(
+                model=self.model,
+                messages=[{"role": "user", "content": full_prompt}]
+            )
+
+        # Display results
+        answer = response['message']['content']
+        console.print(Panel(
+            Markdown(answer),
+            title="🖥️  System Assistant Response",
+            border_style="green"
+        ))
 
     def parse_commands(self, response: str) -> List[str]:
         """Extract executable commands from AI response"""
@@ -31,7 +69,7 @@ class CommandExecutor:
             console.print(f"\n[bold cyan]⚡ Executing:[/bold cyan] [bold white]{cmd}[/bold white]")
 
             # Check for commands that need sudo
-            if any(cmd.strip().startswith(prefix) for prefix in Config.SUDO_PREFIXES):
+            if any(cmd.strip().startswith(prefix) for prefix in self.config.SUDO_PREFIXES):
                 console.print("[bold yellow]⚠️  This command requires administrator privileges![/bold yellow]")
 
             result = subprocess.run(
